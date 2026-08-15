@@ -330,19 +330,6 @@ export async function listCourseSessions(courseId: string, forceRefresh = false)
   }, DAILY_CACHE_MS, forceRefresh);
 }
 
-export async function enrollInCourse(courseId: string) {
-  // Normally triggers if price gets 0 mapped, placeholder for backend trigger
-  const formData = new FormData();
-  formData.append("month", "1");
-  const user = getCurrentUser();
-  if (user) formData.append("user_id", user.uid);
-
-  return request("/app_buy_course_detail/" + courseId + "/", {
-    method: "POST",
-    body: formData,
-  });
-}
-
 export async function updateSessionProgress(params: {
   courseId: string;
   sessionId: string;
@@ -445,86 +432,4 @@ export async function updateCourseDetailsBulk(items: any[]) {
 
   await listHomeCategories(true).catch(() => []);
   return result;
-}
-
-// --- CART & PAYMENT FUNCTIONS ---
-
-export async function listServiceMonths(courseId: string) {
-  const response = await request<{ status: string; data: any[] }>(`/app_get_service_month/?course_id=${courseId}`);
-  return (response.data || []).map((item) => ({
-    ...item,
-    id: String(item.id),
-    month: Number(item.month ?? item.months ?? 1) || 1,
-    price: Number(item.price ?? item.money ?? item.amount ?? 0) || 0,
-  }));
-}
-
-export async function getServicePrice(params: { courseId: string; monthId: string }) {
-  const user = getCurrentUser();
-  const url = `/app_get_service_price/?course_id=${params.courseId}&month_id=${params.monthId}${user?.uid ? `&user_id=${user.uid}` : ''}`;
-  const response = await request<{ status: string; data: any }>(url);
-  return response.data;
-}
-
-export async function applyCouponCode(params: { courseId: string; couponCode: string }) {
-  const user = getCurrentUser();
-  const url = `/app_apply_coupon_code/?course_id=${params.courseId}&coupon_code=${params.couponCode}${user?.uid ? `&user_id=${user.uid}` : ''}`;
-  const response = await request<{ status: string; coupon_data: any }>(url);
-  return response.coupon_data;
-}
-
-export type AppPaymentInitResponse = {
-  merchant_reference_id?: string;
-  merchantReferenceId?: string;
-  orderId?: string;
-  token?: string;
-  sdkOrderId?: string;
-  sdkOrderToken?: string;
-  sdk_order_id?: string;
-  sdk_order_token?: string;
-  order_id?: string;
-  order_token?: string;
-  amount?: number | string;
-  redirectUrl?: string;
-  redirect_url?: string;
-  paymentMode?: string | { type?: string };
-  payment_mode?: string | { type?: string };
-  merchantId?: string;
-  merchant_id?: string;
-  phonePeEnvironment?: string;
-  phonepe_environment?: string;
-  targetAppPackageName?: string;
-  target_app_package_name?: string;
-};
-
-export async function initiateAppPayment(params: { courseId: string; month: number; couponCode: string }) {
-  const formData = new FormData();
-  formData.append("month", String(params.month));
-  if (params.couponCode) formData.append("coupon_code", params.couponCode);
-  
-  // Add return URL for payment gateway callback
-  formData.append("return_url", "therapyapp://payment-return");
-  
-  const user = getCurrentUser();
-  if (user) formData.append("user_id", user.uid);
-
-  return request<AppPaymentInitResponse>(`/app-buy-course-sdk/${params.courseId}/`, {
-    method: "POST",
-    body: formData,
-  });
-}
-
-export async function confirmAppPayment(merchantReferenceId: string) {
-  const formData = new FormData();
-  formData.append("merchant_reference_id", merchantReferenceId);
-  return request("/app_payment_confirm/", {
-    method: "POST",
-    body: formData,
-  });
-}
-
-export async function getAppPaymentStatus(merchantReferenceId: string) {
-  return request<{ status: string; payment_state: string }>(
-    `/app_payment_status/?merchant_reference_id=${merchantReferenceId}`
-  );
 }

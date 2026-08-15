@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,18 +12,16 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import CartCheckoutModal from "../../components/CartCheckoutModal";
 import SessionList from "../../components/SessionList";
 import {
-  enrollInCourse,
   getCourse,
-  getServicePrice,
-  listServiceMonths,
   listMyCourses,
   updateSessionProgress,
 } from "../../lib/api";
 import { useAuthUid } from "../../lib/useAuth";
 import { Course } from "../../types/backend";
+
+const MRC_THERAPY_WEBSITE_URL = "https://mrctherapy.com";
 
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,9 +29,9 @@ export default function CourseDetailScreen() {
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
-  const [showCartModal, setShowCartModal] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [enrollmentId, setEnrollmentId] = useState<string | undefined>();
+  const courseId = course?.id;
 
   useEffect(() => {
     const loadCourse = async () => {
@@ -56,48 +55,28 @@ export default function CourseDetailScreen() {
   }, [id]);
 
   useEffect(() => {
-    if (course?.id && uid) {
-      void checkEnrollmentStatus();
-    }
-  }, [course?.id, uid]);
+    if (!courseId || !uid) return;
 
-  const checkEnrollmentStatus = async () => {
-    if (!course?.id || !uid) return;
+    const checkEnrollmentStatus = async () => {
+      try {
+        const myCourses = await listMyCourses();
+        const match = myCourses.find((item) => item.id === courseId);
+        setIsEnrolled(!!match);
+        setEnrollmentId(match?.id);
+      } catch (error) {
+        console.log("Check enrollment status error:", error);
+      }
+    };
 
-    try {
-      const myCourses = await listMyCourses();
-      const match = myCourses.find((item) => item.id === course.id);
-      setIsEnrolled(!!match);
-      setEnrollmentId(match?.id);
-    } catch (error) {
-      console.log("Check enrollment status error:", error);
-    }
-  };
-
-  const requireLogin = () => {
-    Alert.alert("Sign in required", "Please sign in to enroll or purchase courses.", [
-      {
-        text: "Sign in",
-        onPress: () =>
-          router.push({
-            pathname: "/login",
-            params: { redirect: id ? `/course/${id}` : "/(tabs)" },
-          }),
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
-  };
-
-  const handlePaymentFailure = () => {
-    Alert.alert("Payment Pending", "Payment is not completed yet. You can reopen the payment sheet and check status again.");
-  };
+    void checkEnrollmentStatus();
+  }, [courseId, uid]);
 
   const handleSessionProgressUpdate = useCallback(async (sessionId: string, position: number, completed: boolean) => {
-    if (!course?.id) return;
+    if (!courseId) return;
 
     try {
       await updateSessionProgress({
-        courseId: course.id,
+        courseId,
         sessionId,
         position,
         completed,
@@ -105,45 +84,27 @@ export default function CourseDetailScreen() {
     } catch (error) {
       console.log("Update session progress error:", error);
     }
-  }, [course?.id]);
+  }, [courseId]);
 
   const handleEnroll = async () => {
     if (!course || enrolling || isEnrolled) return;
 
     if (!uid) {
-      requireLogin();
+      router.push({
+        pathname: "/login",
+        params: {
+          redirect: `/course/${course.id}`,
+        },
+      });
       return;
     }
 
     try {
       setEnrolling(true);
-
-      if (course.isPaid) {
-        const months = await listServiceMonths(course.id).catch(() => []);
-        const firstMonth = months[0];
-        const priceData = firstMonth
-          ? await getServicePrice({ courseId: course.id, monthId: firstMonth.id }).catch(() => null)
-          : null;
-        const resolvedPrice = Number(priceData?.price ?? firstMonth?.price ?? course.price ?? 0);
-
-        if (Number.isFinite(resolvedPrice) && resolvedPrice <= 0) {
-          await enrollInCourse(course.id);
-          await checkEnrollmentStatus();
-          Alert.alert("Success", "Free course added to My Course.");
-          return;
-        }
-
-        setShowCartModal(true);
-        return;
-      }
-
-      await enrollInCourse(course.id);
-      await checkEnrollmentStatus();
-
-      Alert.alert("Success", "Free course added to My Course.");
+      await Linking.openURL(MRC_THERAPY_WEBSITE_URL);
     } catch (error) {
       console.log("Enroll error:", error);
-      Alert.alert("Not available", "Unable to start enrollment right now.");
+      Alert.alert("Unable to open website", "Please try again or open mrctherapy.com in your browser.");
     } finally {
       setEnrolling(false);
     }
@@ -229,9 +190,7 @@ export default function CourseDetailScreen() {
               ? "Processing..."
               : isEnrolled
                 ? "Go to My Course"
-                : course.isPaid
-                  ? "Enroll Now"
-                  : "Get Course"
+                : "Enroll on Website"
             }
           </Text>
         </Pressable>
@@ -241,14 +200,6 @@ export default function CourseDetailScreen() {
         </Pressable>
       </ScrollView>
 
-      {course.isPaid && !isEnrolled ? (
-        <CartCheckoutModal
-          visible={showCartModal}
-          course={course}
-          onClose={() => setShowCartModal(false)}
-          onPaymentFailure={handlePaymentFailure}
-        />
-      ) : null}
     </SafeAreaView>
   );
 }

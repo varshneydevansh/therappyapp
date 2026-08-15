@@ -41,10 +41,7 @@ export default function RootLayout() {
       />
       <Stack.Screen name="register" />
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="payment" />
-      <Stack.Screen name="payment-return" />
       <Stack.Screen name="course/[id]" />
     </Stack>
   );
 }
-
