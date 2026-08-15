@@ -126,13 +126,29 @@ export async function startPhonePePayment(
     return { status: "SUCCESS" };
   }
 
+  const paymentMode = resolvePhonePePaymentMode(params.paymentMode);
+  const transactionRequest =
+    Platform.OS === "ios"
+      ? {
+          merchantId: params.merchantId,
+          orderId: params.orderId,
+          token: params.token,
+          paymentMode: {
+            type: paymentMode,
+            ...(params.targetAppPackageName
+              ? { targetApp: params.targetAppPackageName }
+              : {}),
+          },
+        }
+      : {
+          orderId: params.orderId,
+          token: params.token,
+          paymentMode,
+          targetAppPackageName: String(params.targetAppPackageName || ""),
+        };
+
   const response = await PHONEPE_PACKAGE_MODULE.startTransaction?.(
-    JSON.stringify({
-      orderId: params.orderId,
-      token: params.token,
-      paymentMode: resolvePhonePePaymentMode(params.paymentMode),
-      targetAppPackageName: String(params.targetAppPackageName || ""),
-    }),
+    JSON.stringify(transactionRequest),
     params.appSchema || "therapyapp"
   );
 

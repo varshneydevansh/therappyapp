@@ -1,8 +1,32 @@
 import { Stack } from "expo-router";
-import { usePreventScreenCapture } from "expo-screen-capture";
+import {
+  disableAppSwitcherProtectionAsync,
+  enableAppSwitcherProtectionAsync,
+  usePreventScreenCapture,
+} from "expo-screen-capture";
+import { useEffect } from "react";
+import { Platform } from "react-native";
+
+const GLOBAL_SCREEN_CAPTURE_KEY = "therapy-app-global-screen-capture";
 
 export default function RootLayout() {
-  usePreventScreenCapture();
+  usePreventScreenCapture(GLOBAL_SCREEN_CAPTURE_KEY);
+
+  useEffect(() => {
+    if (Platform.OS !== "ios") {
+      return;
+    }
+
+    void enableAppSwitcherProtectionAsync(1).catch((error) => {
+      console.warn("Unable to enable app-switcher privacy protection", error);
+    });
+
+    return () => {
+      void disableAppSwitcherProtectionAsync().catch((error) => {
+        console.warn("Unable to disable app-switcher privacy protection", error);
+      });
+    };
+  }, []);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -23,5 +47,4 @@ export default function RootLayout() {
     </Stack>
   );
 }
-
 
