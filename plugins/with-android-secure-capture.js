@@ -100,6 +100,121 @@ function ensureMainActivityCapturePolicy(config) {
   ]);
 }
 
+function ensureIOSAppDelegateCaptureAudio(source) {
+  if (!source.includes("import AVFoundation")) {
+    const firstImport = source.match(/^import .+$/m)?.[0];
+    source = firstImport
+      ? source.replace(firstImport, `${firstImport}\nimport AVFoundation`)
+      : `import AVFoundation\n${source}`;
+  }
+
+  const captureAudioProperties =
+    "  private var screenCaptureAudioObserver: NSObjectProtocol?\n" +
+    "  private var screenCaptureAudioIsBlocked = false\n";
+  if (!source.includes("private var screenCaptureAudioObserver")) {
+    const factoryProperty = "  var reactNativeFactory: RCTReactNativeFactory?\n";
+    if (source.includes(factoryProperty)) {
+      source = source.replace(factoryProperty, `${factoryProperty}${captureAudioProperties}`);
+    }
+  }
+
+  if (source.includes("private func installScreenCaptureAudioGuard")) {
+    return source;
+  }
+
+  const applicationMethod = /(  (?:public )?override func application\([\s\S]*?\n  \) -> Bool \{\n)/;
+  if (!applicationMethod.test(source)) {
+    return source;
+  }
+
+  source = source.replace(applicationMethod, "$1    installScreenCaptureAudioGuard()\n\n");
+
+  const captureAudioMethods = `
+  private func installScreenCaptureAudioGuard() {
+    guard screenCaptureAudioObserver == nil else {
+      return
+    }
+
+    screenCaptureAudioObserver = NotificationCenter.default.addObserver(
+      forName: UIScreen.capturedDidChangeNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      self?.updateScreenCaptureAudioProtection()
+    }
+
+    updateScreenCaptureAudioProtection()
+  }
+
+  private func updateScreenCaptureAudioProtection() {
+    let isCaptured = UIScreen.main.isCaptured
+    guard isCaptured != screenCaptureAudioIsBlocked else {
+      return
+    }
+
+    let audioSession = AVAudioSession.sharedInstance()
+
+    do {
+      if #available(iOS 26.0, *) {
+        _ = try audioSession.setOutputMuted(isCaptured)
+      } else if isCaptured {
+        try audioSession.setActive(false, options: [.notifyOthersOnDeactivation])
+      } else {
+        try audioSession.setActive(true)
+      }
+
+      screenCaptureAudioIsBlocked = isCaptured
+    } catch {
+      NSLog("Unable to update screen-capture audio protection: %@", error.localizedDescription)
+    }
+  }
+
+  deinit {
+    if let screenCaptureAudioObserver {
+      NotificationCenter.default.removeObserver(screenCaptureAudioObserver)
+    }
+  }
+`;
+
+  const linkingApiMarker = "\n  // Linking API";
+  if (source.includes(linkingApiMarker)) {
+    return source.replace(linkingApiMarker, `${captureAudioMethods}${linkingApiMarker}`);
+  }
+
+  const delegateBoundary = "\n}\n\nclass ReactNativeDelegate";
+  return source.includes(delegateBoundary)
+    ? source.replace(delegateBoundary, `${captureAudioMethods}${delegateBoundary}`)
+    : source;
+}
+
+function ensureIOSCaptureAudioPolicy(config) {
+  return withDangerousMod(config, [
+    "ios",
+    (config) => {
+      const projectName = config.modRequest.projectName;
+
+      if (!projectName) {
+        return config;
+      }
+
+      const appDelegatePath = path.join(
+        config.modRequest.platformProjectRoot,
+        projectName,
+        "AppDelegate.swift"
+      );
+
+      if (!fs.existsSync(appDelegatePath)) {
+        return config;
+      }
+
+      const source = fs.readFileSync(appDelegatePath, "utf8");
+      fs.writeFileSync(appDelegatePath, ensureIOSAppDelegateCaptureAudio(source));
+
+      return config;
+    },
+  ]);
+}
+
 module.exports = function withAndroidSecureCapture(config) {
   config = withAndroidManifest(config, (config) => {
     const application = config.modResults.manifest.application?.[0];
@@ -111,5 +226,6 @@ module.exports = function withAndroidSecureCapture(config) {
     return config;
   });
 
-  return ensureMainActivityCapturePolicy(config);
+  config = ensureMainActivityCapturePolicy(config);
+  return ensureIOSCaptureAudioPolicy(config);
 };
