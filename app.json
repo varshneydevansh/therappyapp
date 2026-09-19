@@ -27,7 +27,8 @@
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "com.mrcayurveda.therappy"
+      "bundleIdentifier": "com.mrcayurveda.therappy",
+      "appleTeamId": "KY69K4VX5D"
     },
     "android": {
       "adaptiveIcon": {
@@ -83,6 +84,9 @@
             "compileSdkVersion": 34,
             "targetSdkVersion": 34,
             "buildToolsVersion": "34.0.0"
+          },
+          "ios": {
+            "buildReactNativeFromSource": true
           }
         }
       ],
