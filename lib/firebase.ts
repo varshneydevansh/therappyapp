@@ -19,18 +19,10 @@ const getReactNativePersistence = (FirebaseAuth as any).getReactNativePersistenc
   | ((storage: typeof AsyncStorage) => any)
   | undefined;
 
-// Force long polling to avoid Firestore transport issues in Expo/RN.
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-});
-
-// Initialize Auth with AsyncStorage persistence for React Native
+export const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 export const auth = getReactNativePersistence
-  ? initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
-    })
+  ? initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) })
   : FirebaseAuth.getAuth(app);
-
 export const storage = getStorage(app);
 
 export default app;

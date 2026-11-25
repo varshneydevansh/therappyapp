@@ -110,7 +110,8 @@ function ensureIOSAppDelegateCaptureAudio(source) {
 
   const captureAudioProperties =
     "  private var screenCaptureAudioObserver: NSObjectProtocol?\n" +
-    "  private var screenCaptureAudioIsBlocked = false\n";
+    "  private var screenCaptureAudioIsBlocked = false\n" +
+    "  private var screenCapturePrivacyView: UIView?\n";
   if (!source.includes("private var screenCaptureAudioObserver")) {
     const factoryProperty = "  var reactNativeFactory: RCTReactNativeFactory?\n";
     if (source.includes(factoryProperty)) {
@@ -140,14 +141,19 @@ function ensureIOSAppDelegateCaptureAudio(source) {
       object: nil,
       queue: .main
     ) { [weak self] _ in
-      self?.updateScreenCaptureAudioProtection()
+      self?.updateScreenCaptureProtection()
     }
 
-    updateScreenCaptureAudioProtection()
+    updateScreenCaptureProtection()
+    DispatchQueue.main.async { [weak self] in
+      self?.updateScreenCaptureProtection()
+    }
   }
 
-  private func updateScreenCaptureAudioProtection() {
+  private func updateScreenCaptureProtection() {
     let isCaptured = UIScreen.main.isCaptured
+    updateScreenCapturePrivacyOverlay(isCaptured)
+
     guard isCaptured != screenCaptureAudioIsBlocked else {
       return
     }
@@ -169,7 +175,31 @@ function ensureIOSAppDelegateCaptureAudio(source) {
     }
   }
 
+  private func updateScreenCapturePrivacyOverlay(_ isCaptured: Bool) {
+    guard let window else {
+      return
+    }
+
+    if isCaptured {
+      if let screenCapturePrivacyView {
+        window.bringSubviewToFront(screenCapturePrivacyView)
+        return
+      }
+
+      let privacyView = UIView(frame: window.bounds)
+      privacyView.backgroundColor = .black
+      privacyView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+      privacyView.isUserInteractionEnabled = false
+      window.addSubview(privacyView)
+      screenCapturePrivacyView = privacyView
+    } else {
+      screenCapturePrivacyView?.removeFromSuperview()
+      screenCapturePrivacyView = nil
+    }
+  }
+
   deinit {
+    screenCapturePrivacyView?.removeFromSuperview()
     if let screenCaptureAudioObserver {
       NotificationCenter.default.removeObserver(screenCaptureAudioObserver)
     }
@@ -184,6 +214,50 @@ function ensureIOSAppDelegateCaptureAudio(source) {
   const delegateBoundary = "\n}\n\nclass ReactNativeDelegate";
   return source.includes(delegateBoundary)
     ? source.replace(delegateBoundary, `${captureAudioMethods}${delegateBoundary}`)
+    : source;
+}
+
+function ensureIOSSceneLifecycle(source) {
+  const appDelegateDeclaration = "class AppDelegate: ExpoAppDelegate {";
+  if (source.includes(appDelegateDeclaration)) {
+    source = source.replace(
+      appDelegateDeclaration,
+      "class AppDelegate: ExpoAppDelegate, ExpoReactNativeFactoryProvider {"
+    );
+  }
+
+  const legacyReactNativeStart = `#if os(iOS) || os(tvOS)
+    window = UIWindow(frame: UIScreen.main.bounds)
+    factory.startReactNative(
+      withModuleName: "main",
+      in: window,
+      launchOptions: launchOptions)
+#endif
+`;
+  source = source.replace(legacyReactNativeStart, "");
+
+  if (source.includes("configurationForConnecting connectingSceneSession")) {
+    return source;
+  }
+
+  const sceneConfiguration = `
+  public func application(
+    _ application: UIApplication,
+    configurationForConnecting connectingSceneSession: UISceneSession,
+    options: UIScene.ConnectionOptions
+  ) -> UISceneConfiguration {
+    let configuration = UISceneConfiguration(
+      name: "Default Configuration",
+      sessionRole: connectingSceneSession.role
+    )
+    configuration.delegateClass = ExpoAppSceneDelegate.self
+    return configuration
+  }
+
+`;
+  const marker = "  private func installScreenCaptureAudioGuard()";
+  return source.includes(marker)
+    ? source.replace(marker, `${sceneConfiguration}${marker}`)
     : source;
 }
 
@@ -208,7 +282,8 @@ function ensureIOSCaptureAudioPolicy(config) {
       }
 
       const source = fs.readFileSync(appDelegatePath, "utf8");
-      fs.writeFileSync(appDelegatePath, ensureIOSAppDelegateCaptureAudio(source));
+      const captureReadySource = ensureIOSAppDelegateCaptureAudio(source);
+      fs.writeFileSync(appDelegatePath, ensureIOSSceneLifecycle(captureReadySource));
 
       return config;
     },

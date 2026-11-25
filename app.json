@@ -2,7 +2,7 @@
   "expo": {
     "name": "MRC Therapy App",
     "slug": "therapy-app",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "therapyapp",
@@ -28,6 +28,7 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "bundleIdentifier": "com.mrcayurveda.therappy",
+      "buildNumber": "7",
       "appleTeamId": "KY69K4VX5D"
     },
     "android": {

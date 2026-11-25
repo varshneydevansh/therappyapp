@@ -2,16 +2,11 @@ import { Stack } from "expo-router";
 import {
   disableAppSwitcherProtectionAsync,
   enableAppSwitcherProtectionAsync,
-  usePreventScreenCapture,
 } from "expo-screen-capture";
 import { useEffect } from "react";
 import { Platform } from "react-native";
 
-const GLOBAL_SCREEN_CAPTURE_KEY = "therapy-app-global-screen-capture";
-
 export default function RootLayout() {
-  usePreventScreenCapture(GLOBAL_SCREEN_CAPTURE_KEY);
-
   useEffect(() => {
     if (Platform.OS !== "ios") {
       return;
@@ -39,7 +34,6 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: "transparent" },
         }}
       />
-      <Stack.Screen name="register" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="course/[id]" />
     </Stack>

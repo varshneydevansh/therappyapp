@@ -272,7 +272,7 @@ export default function MyCourseScreen() {
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyTitle}>No courses enrolled yet</Text>
-            <Text style={styles.emptyText}>Go to Home, open a course, and tap Enroll.</Text>
+            <Text style={styles.emptyText}>Your active courses will appear here.</Text>
           </View>
         }
       />

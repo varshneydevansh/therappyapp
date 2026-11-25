@@ -3,8 +3,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,14 +19,11 @@ import {
 import { useAuthUid } from "../../lib/useAuth";
 import { Course } from "../../types/backend";
 
-const MRC_THERAPY_WEBSITE_URL = "https://mrctherapy.com";
-
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const uid = useAuthUid();
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
-  const [enrolling, setEnrolling] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [enrollmentId, setEnrollmentId] = useState<string | undefined>();
   const courseId = course?.id;
@@ -85,30 +80,6 @@ export default function CourseDetailScreen() {
       console.log("Update session progress error:", error);
     }
   }, [courseId]);
-
-  const handleEnroll = async () => {
-    if (!course || enrolling || isEnrolled) return;
-
-    if (!uid) {
-      router.push({
-        pathname: "/login",
-        params: {
-          redirect: `/course/${course.id}`,
-        },
-      });
-      return;
-    }
-
-    try {
-      setEnrolling(true);
-      await Linking.openURL(MRC_THERAPY_WEBSITE_URL);
-    } catch (error) {
-      console.log("Enroll error:", error);
-      Alert.alert("Unable to open website", "Please try again or open mrctherapy.com in your browser.");
-    } finally {
-      setEnrolling(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -180,20 +151,11 @@ export default function CourseDetailScreen() {
           />
         )}
 
-        <Pressable
-          style={[styles.enrollButton, (enrolling || isEnrolled) && styles.enrollButtonDisabled]}
-          onPress={isEnrolled ? () => router.push("/(tabs)/my-course") : handleEnroll}
-          disabled={enrolling}
-        >
-          <Text style={styles.enrollButtonText}>
-            {enrolling
-              ? "Processing..."
-              : isEnrolled
-                ? "Go to My Course"
-                : "Enroll on Website"
-            }
-          </Text>
-        </Pressable>
+        {isEnrolled && (
+          <Pressable style={styles.enrollButton} onPress={() => router.push("/(tabs)/my-course")}>
+            <Text style={styles.enrollButtonText}>Go to My Course</Text>
+          </Pressable>
+        )}
 
         <Pressable style={styles.secondaryBackButton} onPress={() => router.push("/(tabs)")}>
           <Text style={styles.secondaryBackButtonText}>Back to Home</Text>

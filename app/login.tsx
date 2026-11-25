@@ -122,7 +122,7 @@ export default function LoginScreen() {
       console.log("Login error:", error);
       Alert.alert(
         "Login failed",
-        "Please check your email and password, or register a new account."
+        "Please check your email and password and try again."
       );
     } finally {
       setLoading(false);
@@ -303,13 +303,6 @@ export default function LoginScreen() {
                   ) : (
                     <Text style={styles.primaryButtonText}>Login</Text>
                   )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.secondaryButton}
-                  onPress={() => router.push("/register")}
-                >
-                  <Text style={styles.secondaryButtonText}>Register</Text>
                 </TouchableOpacity>
 
                 <Pressable

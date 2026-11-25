@@ -111,38 +111,6 @@ export async function loginWithApi(identifier: string, password: string): Promis
   return user;
 }
 
-export async function registerWithApi(params: any): Promise<AppUser> {
-  const formData = new FormData();
-  formData.append("full_name", params.fullName);
-  formData.append("email", params.email);
-  formData.append("phone", params.phone);
-  formData.append("password", params.password);
-  if (params.address) formData.append("address", params.address);
-
-  const response = await request<{ status: string; user: any; token?: string; msg?: string }>(
-    "/accounts/app_register/",
-    {
-      method: "POST",
-      body: formData,
-    }
-  );
-
-  if (response.status !== "success") {
-    throw new Error(response.msg || "Registration failed");
-  }
-
-  const user: AppUser = {
-    uid: String(response.user.user_id),
-    email: response.user.email,
-    fullName: response.user.full_name,
-    phone: response.user.phone,
-    isStaff: response.user.is_staff,
-  };
-
-  await setAuthSession(user, response.token || "session-token");
-  return user;
-}
-
 export async function logoutWithApi() {
   await request("/accounts/app_logout/", { method: "POST" }).catch(() => {});
   await clearAuthSession();
